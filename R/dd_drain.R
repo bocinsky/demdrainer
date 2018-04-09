@@ -8,14 +8,30 @@
 #' @param ... Arguments passed on to various [FedData] functions.
 #'
 #' @return A drained [raster::raster] DEM.
+#' @importFrom magrittr %>% %<>% %$%
 #' @export
 #'
 #' @examples
+#' library(sf)
+#' library(demdrainer)
+#' x <- mcor::mt_counties %>% dplyr::filter(County == "Missoula") %>% sf::st_bbox()
 dd_drain <-
   function(x,
+           label,
            ...) {
 
+    if(missing(label))
+      label <- "test"
 
+    if(class(x) == "bbox"){
+      x %<>%
+        FedData::get_ned(template = x %>%
+                           sf::st_as_sfc() %>%
+                           as("Spatial"),
+                         label = label)
+    }
+
+    nhd <- FedData::get_nhd(x)
 
     getNHD(dem)
 

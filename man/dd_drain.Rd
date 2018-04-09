@@ -4,7 +4,7 @@
 \alias{dd_drain}
 \title{Drain Your Dammed DEM}
 \usage{
-dd_drain(x, ...)
+dd_drain(x, label, ...)
 }
 \arguments{
 \item{x}{A \link[raster:raster]{raster::raster} DEM. Alternatively, a \link[sf:st_bbox]{sf::st_bbox} object for which a DEM will
@@ -18,4 +18,9 @@ A drained \link[raster:raster]{raster::raster} DEM.
 \description{
 Given a digital elevation model (DEM) with human-made dammed reservoirs,
 returns a version with estimates for elevations under reservoirs and dams.
+}
+\examples{
+library(sf)
+library(demdrainer)
+x <- mcor::mt_counties \%>\% dplyr::filter(County == "Missoula") \%>\% sf::st_bbox()
 }
