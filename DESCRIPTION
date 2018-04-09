@@ -1,7 +1,7 @@
 Package: demdrainer
 Title: Drain Your Dammed DEMs
 Version: 0.0.0.9000
-Authors@R: person("Kyle", "Bocinsky", "bocinsky@gmail.com", c("aut", "cre"))
+Authors@R: person(given = "Kyle", family = "Bocinsky", email = "bocinsky@gmail.com", role = c("aut", "cre"))
 Description: This package drains your dammed DEMs!
 License: MIT + file LICENSE
 URL: https://github.com/bocinsky/demdrainer
@@ -17,4 +17,7 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 6.0.1
 Imports: 
-    rlang (>= 0.1.2)
+    rlang (>= 0.1.2),
+    sf,
+    raster,
+    FedData
