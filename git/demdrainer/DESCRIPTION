@@ -1,0 +1,11 @@
+Package: demdrainer
+Version: 0.0.0.9000
+Title: Drain Your Dammed DEMs
+Description: This package drains your dammed DEMs!
+Authors@R: person("Kyle", "Bocinsky", "bocinsky@gmail.com", c("aut", "cre"))
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+ByteCompile: true
+URL: https://github.com/bocinsky/demdrainer
+BugReports: https://github.com/bocinsky/demdrainer/issues
