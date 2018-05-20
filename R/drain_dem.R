@@ -15,7 +15,7 @@
 #' library(sf)
 #' library(demdrainer)
 #' x <- mcor::mt_counties %>% dplyr::filter(County == "Missoula") %>% sf::st_bbox()
-dd_drain <-
+drain_dem <-
   function(x,
              label,
              ...) {
@@ -33,9 +33,12 @@ dd_drain <-
         )
     }
 
-    nhd <- FedData::get_nhd(x)
+    nhd <- FedData::get_nhd(x,
+                            label = label)
 
-    getNHD(dem)
+    ssurgo <- FedData::get_ssurgo(x,
+                                  label = label)
+
 
     getNRCS_Dams(dem)
 

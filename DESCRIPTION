@@ -10,7 +10,9 @@ Depends:
     R (>= 3.1)
 Suggests: 
     covr (>= 3.0.1),
-    testthat (>= 2.0.0)
+    testthat (>= 2.0.0),
+    knitr,
+    rmarkdown
 ByteCompile: true
 Encoding: UTF-8
 LazyData: true
@@ -21,3 +23,4 @@ Imports:
     sf,
     raster,
     FedData
+VignetteBuilder: knitr
