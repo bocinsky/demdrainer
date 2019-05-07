@@ -125,7 +125,7 @@ splitAndExport <- function(shapes, layers, dsn.vectors="Output/vectors") {
 mergeStreams <- function(x, proj4string) {
   Streams.final <- vector("list")
   for (i in 1:length(x)) {
-    temp.merge <- gLineMerge(SpatialLines(list(x[i, ]@lines[[1]]), proj4string = master.proj))
+    temp.merge <- gLineMerge(SpatialLines(list(x[i, ]@lines[[1]]), proj4string = sp::CRS(proj4string)))
     for (j in 1:length(temp.merge@lines)) {
       for (k in 1:length(temp.merge@lines[[j]]@Lines)) {
         Streams.final <- c(Streams.final, temp.merge@lines[[j]]@Lines[[k]])
@@ -138,7 +138,7 @@ mergeStreams <- function(x, proj4string) {
   for (i in 1:length(Streams.lines.list)) {
     Streams.lines.list[[i]]@ID <- paste("Stream", i)
   }
-  Streams <- SpatialLines(Streams.lines.list, proj4string = CRS(proj4string))
+  Streams <- SpatialLines(Streams.lines.list, proj4string = sp::CRS(proj4string))
   return(Streams)
 }
 
@@ -233,7 +233,13 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
     end.logic <- vector("logical", length(streams))
     for (i in 1:length(streams)) {
       if (finished.lines[i]) next
-      ends[[i]] <- extract(gappedDEM, matrix(c(head(streams[i]@lines[[1]]@Lines[[1]]@coords, n = 1), tail(streams[i]@lines[[1]]@Lines[[1]]@coords, n = 1)), nrow = 2, byrow = T), cellnumbers = T)
+      ends[[i]] <- extract(gappedDEM,
+                           matrix(c(head(streams[i,]@lines[[1]]@Lines[[1]]@coords,
+                                        n = 1), tail(streams[i,]@lines[[1]]@Lines[[1]]@coords,
+                                                     n = 1)),
+                                 nrow = 2,
+                                 byrow = T),
+                           cellnumbers = T)
 
       if (is.na(ends[[i]][1, 2])) {
         minLocalValue <- suppressWarnings(min(gappedDEM[adjacent(gappedDEM, ends[[i]][1, 1], directions = 8, include = T)[, 2]], na.rm = T))
@@ -257,7 +263,7 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
     # Don't re-calculate if a stream has already been interpolated.
     for (i in 1:length(streams)) {
       if (finished.lines[i] | !end.logic[i]) next
-      extracts[[i]] <- extract(gappedDEM, streams[i], along = T, cellnumbers = T)[[1]]
+      extracts[[i]] <- extract(gappedDEM, streams[i,], along = T, cellnumbers = T)[[1]]
     }
 
     if (last) {
@@ -265,13 +271,13 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
       for (i in 1:length(streams)) {
         if (finished.lines[i]) next
 
-        ends[[i]] <- extract(gappedDEM, matrix(c(head(streams[i]@lines[[1]]@Lines[[1]]@coords, n = 1), tail(streams[i]@lines[[1]]@Lines[[1]]@coords, n = 1)), nrow = 2, byrow = T), cellnumbers = TRUE)
+        ends[[i]] <- extract(gappedDEM, matrix(c(head(streams[i,]@lines[[1]]@Lines[[1]]@coords, n = 1), tail(streams[i,]@lines[[1]]@Lines[[1]]@coords, n = 1)), nrow = 2, byrow = T), cellnumbers = TRUE)
 
         if (length((ends[[i]][, 1])[is.na(ends[[i]][, 2])]) > 0) {
           minimum <- getNearestMinimum(gappedDEM, (ends[[i]][, 1])[is.na(ends[[i]][, 2])])
           gappedDEM[(ends[[i]][, 1])[is.na(ends[[i]][, 2])]] <- minimum
         }
-        extracts[[i]] <- extract(gappedDEM, streams[i], along = T, cellnumbers = T)[[1]]
+        extracts[[i]] <- extract(gappedDEM, streams[i,], along = T, cellnumbers = T)[[1]]
       }
     }
 
@@ -331,7 +337,7 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
       local <- adjacent(gappedDEM, temp.na$cell, pairs = F, directions = 16)
 
       gappedDEM[local] <- gappedDEM[cellFromXY(gappedDEM, t(apply(xyFromCell(gappedDEM, local), 1, function(x) {
-        nearestPointOnLine(streams[i]@lines[[1]]@Lines[[1]]@coords, x)
+        maptools::nearestPointOnLine(streams[i,]@lines[[1]]@Lines[[1]]@coords, x)
       })))]
 
       gappedDEM <- setMinMax(gappedDEM)
@@ -384,7 +390,7 @@ fillIDW <- function(gappedDEM) {
   gappedDEM.df.known <- gappedDEM.df[!is.na(gappedDEM.df$ELEVATION), ]
   gappedDEM.df.unknown <- gappedDEM.df[is.na(gappedDEM.df$ELEVATION), ]
   gappedDEM.idw.model <- gstat(id = "ELEVATION", formula = ELEVATION ~ 1, locations = ~ x + y, data = gappedDEM.df.known, nmax = 7, set = list(idp = 0.5))
-  gappedDEM.df.new <- predict.gstat(gappedDEM.idw.model, newdata = gappedDEM.df.unknown)
+  gappedDEM.df.new <- predict(gappedDEM.idw.model, newdata = gappedDEM.df.unknown)
   gappedDEM.df.new$CELL <- cellFromXY(gappedDEM, as.matrix(gappedDEM.df.new[, 1:2]))
   gappedDEM.final <- gappedDEM
   gappedDEM.final[gappedDEM.df.new$CELL] <- gappedDEM.df.new$ELEVATION.pred
@@ -571,52 +577,6 @@ getSoilData <- function(x, raw.dir="./Input/NRCS", dsn.vectors="Output/vectors",
   }
 }
 
-
-# A method to crop vector shapefiles to a given study area.
-crop.to.studyArea <- function(x, y) {
-  gI <- gIntersects(x, y, byid = TRUE)
-  out <- vector(mode = "list", length = length(which(gI)))
-  ii <- 1
-  if (length(out) == 0) return(NULL)
-  for (i in seq(along = gI)) {
-    if (gI[i]) {
-      out[[ii]] <- gIntersection(x[i, ], y)
-      row.names(out[[ii]]) <- row.names(x)[i]
-      ii <- ii + 1
-    }
-  }
-  out_class <- sapply(out, class)
-
-  if (class(x)[1] == "SpatialLinesDataFrame") {
-    ri <- do.call("rbind", out[out_class == "SpatialLines"])
-    ri <- SpatialLinesDataFrame(ri, as.data.frame(x))
-    return(ri)
-  } else if (class(x)[1] == "SpatialPolygonsDataFrame") {
-    ri <- do.call("rbind", out[out_class == "SpatialPolygons"])
-    ri <- SpatialPolygonsDataFrame(ri, as.data.frame(x)[row.names(ri), ])
-    return(ri)
-  } else if (class(x)[1] == "SpatialPointsDataFrame") {
-    ri <- do.call("rbind", out[out_class == "SpatialPoints"])
-    ri <- SpatialPointsDataFrame(ri, as.data.frame(x)[row.names(ri), ], match.ID = TRUE)
-    return(ri)
-  }
-}
-
-# A method to create a spatial polygon from the extent of a spatial* or raster* object
-polygonFromExtent <- function(x, proj4string) {
-  extent.matrix <- rbind(c(x@xmin, x@ymin), c(x@xmin, x@ymax), c(x@xmax, x@ymax), c(x@xmax, x@ymin), c(x@xmin, x@ymin)) # clockwise, 5 points to close it
-  extent.SP <- SpatialPolygons(list(Polygons(list(Polygon(extent.matrix)), "extent")), proj4string = CRS(proj4string))
-  return(extent.SP)
-}
-
-# A method to create a SpatialPolygonsDataFrame from a single polygon.
-SPDFfromPolygon <- function(x) {
-  IDs <- sapply(slot(x, "polygons"), function(x) slot(x, "ID"))
-  df <- data.frame(rep(0, length(IDs)), row.names = IDs)
-  x <- SpatialPolygonsDataFrame(x, df)
-  return(x)
-}
-
 # A function that takes a sometimes erratic stream profile
 # and makes it monotonic (strictly downward or upward sloping)
 # for the purposes of interpolating across gaps.
@@ -632,158 +592,3 @@ make.monotonic <- function(x) {
   return(x)
 }
 
-# A method to plot rasters as a PNG
-raster.png <- function(x, zlim, palette, file.name, title, legend.lab, extra.vector.plots.function, extra.label.plots.function) {
-  image.width <- 7
-  image.height <- 7
-  x <- setMinMax(x)
-
-  if (is.na(zlim[1])) {
-    zlim <- c(min(getValues(x)), max(getValues(x)))
-  }
-
-  ratio.raster <- ncol(x) / nrow(x)
-
-  if (ratio.raster >= 1) {
-    image.height <- max(image.width * (1 / ratio.raster), 4)
-  } else {
-    image.width <- image.height * ratio.raster
-  }
-
-  colors <- palette
-  quartz(file = file.name, width = image.width, height = image.height, antialias = FALSE, bg = "white", type = "png", family = "Gulim", pointsize = 1, dpi = 1200)
-  if (ratio.raster >= 1) {
-    plot.width <- 6
-    plot.height <- plot.width * (1 / ratio.raster)
-    inch <- (extent(x)@xmax - extent(x)@xmin) / (image.width - 1)
-    par(mai = c((image.height - plot.height) / 2, 0.5, (image.height - plot.height) / 2, 0.5), omi = c(0, 0, 0, 0), pin = c(plot.width, plot.height))
-  } else {
-    plot.height <- 6
-    plot.width <- plot.height * ratio.raster
-    inch <- (extent(x)@ymax - extent(x)@ymin) / (image.height - 1)
-    par(mai = c(0.5, (image.width - plot.width) / 2, 0.5, (image.width - plot.width) / 2), omi = c(0, 0, 0, 0), pin = c(plot.width, plot.height))
-  }
-  par(bg = "white", fg = "black", col.lab = "black", col.main = "black", col.axis = "black", family = "Helvetica Bold", lend = 2, ljoin = 1)
-  plot(x, maxpixels = ncell(x), xlim = c(extent(x)@xmin, extent(x)@xmax), ylim = c(extent(x)@ymin, extent(x)@ymax), zlim = zlim, xlab = "", ylab = "", axes = FALSE, main = "", asp = 1, col = colors, useRaster = FALSE, legend = FALSE)
-
-  plot(sim.poly, add = TRUE)
-
-  if (!is.na(extra.vector.plots.function)) {
-    FUN <- match.fun(extra.vector.plots.function)
-    FUN()
-  }
-
-  # plot(x,add=T,col=colors, useRaster=FALSE, legend=FALSE)
-  xseq <- c(seq(extent(x)@xmin, extent(x)@xmax, by = round_any((extent(x)@xmax - extent(x)@xmin) / 10, 1000)), extent(x)@xmax)
-  yseq <- c(seq(extent(x)@ymin, extent(x)@ymax, by = round_any((extent(x)@xmax - extent(x)@xmin) / 10, 1000)), extent(x)@ymax)
-
-  if (abs(diff(tail(xseq, n = 2))) < ((extent(x)@xmax - extent(x)@xmin) / (length(xseq) - 1))) {
-    xseq <- xseq[-(length(xseq) - 1)]
-  }
-
-  if (abs(diff(tail(yseq, n = 2))) < ((extent(x)@xmax - extent(x)@xmin) / (length(yseq) - 1))) {
-    yseq <- yseq[-(length(yseq) - 1)]
-  }
-
-  #   par(tck=(-1*(0.01)), family="Helvetica", lend=2)
-  #   axis(3, at=xseq, cex.axis=7, lwd=-1, lwd.ticks=1, padj=-.4, pos=(extent(x)@ymax), labels=FALSE)
-  #   text(xseq, extent(x)@ymax+(0.08*inch), labels = c(xseq[-length(xseq)],''), srt = 45, pos = 4, xpd = TRUE, cex=7)
-  #   axis(4, at=yseq, cex.axis=7, lwd=-1, lwd.ticks=1, padj=-.4, pos=(extent(x)@xmax), labels=FALSE)
-  #   text(extent(x)@xmax+(0.08*inch), yseq, labels = c(yseq[-length(yseq)],''), srt = 45, pos = 4, xpd = TRUE, cex=7)
-  #
-  #   text(extent(x)@xmax, extent(x)@ymax+(0.08*inch), labels = extent(x)@xmax, srt = 90, pos = 4, xpd = TRUE, cex=7)
-  #   text(extent(x)@xmax+(0.08*inch), extent(x)@ymax,labels = extent(x)@ymax, srt = 0, pos = 4, xpd = TRUE, cex=7)
-  #
-  plot(sim.poly, add = TRUE)
-
-  par(bty = "o", tck = -(1 / 4))
-
-  if (!is.na(extra.label.plots.function)) {
-    FUN <- match.fun(extra.label.plots.function)
-    FUN(x, inch)
-  } else {
-    plot(x, maxpixels = ncell(x), add = TRUE, legend.only = TRUE, col = colors, smallplot = c(0.5, (((image.width - plot.width) / 2) + plot.width) / image.width, (((image.height - plot.height) / 2) - 0.15) / image.height, (((image.height - plot.height) / 2) - 0.05) / image.height), horiz = TRUE, axis.args = list(cex.axis = 7, lwd = 0, lwd.ticks = 0.15 * 6, pos = -0.25, padj = 1.1, bty = "o"), zlim = zlim, legend.args = list(text = legend.lab, side = 1, font = 2, line = 16, cex = 8))
-  }
-
-  text(extent(x)@xmin, (extent(x)@ymin - (0.14 * inch)), labels = title, pos = 4, xpd = TRUE, cex = 14, font = 2)
-
-  #   text(extent(x)@xmin,(extent(x)@ymin-(0.21*inch)), labels='R. Kyle Bocinsky', pos = 4, xpd = TRUE, cex=4,font=2)
-  #   text(extent(x)@xmin,(extent(x)@ymin-(0.28*inch)), labels=format(Sys.Date(), "%d %B %Y"), pos = 4, xpd = TRUE, cex=4,font=2)
-  #   text(extent(x)@xmin,(extent(x)@ymin-(0.35*inch)), labels=paste('PROJ.4 String: ',projection(x),sep=''), pos = 4, xpd = TRUE, cex=4,font=2)
-
-  dev.off()
-}
-
-# A method to plot multiband (RBG) rasters as a PNG
-rasterRGB.png <- function(x, file.name, title, extra.vector.plots.function, extra.label.plots.function) {
-  image.width <- 7
-  image.height <- 7
-  x <- setMinMax(x)
-
-  ratio.raster <- ncol(x) / nrow(x)
-
-  if (ratio.raster >= 1) {
-    image.height <- max(image.width * (1 / ratio.raster), 4)
-  } else {
-    image.width <- image.height * ratio.raster
-  }
-
-  colors <- palette
-  quartz(file = file.name, width = image.width, height = image.height, antialias = FALSE, bg = "white", type = "png", family = "Gulim", pointsize = 1, dpi = 1200)
-  if (ratio.raster >= 1) {
-    plot.width <- 6
-    plot.height <- plot.width * (1 / ratio.raster)
-    inch <- (extent(x)@xmax - extent(x)@xmin) / (image.width - 1)
-    par(mai = c((image.height - plot.height) / 2, 0.5, (image.height - plot.height) / 2, 0.5), omi = c(0, 0, 0, 0), pin = c(plot.width, plot.height))
-  } else {
-    plot.height <- 6
-    plot.width <- plot.height * ratio.raster
-    inch <- (extent(x)@ymax - extent(x)@ymin) / (image.height - 1)
-    par(mai = c(0.5, (image.width - plot.width) / 2, 0.5, (image.width - plot.width) / 2), omi = c(0, 0, 0, 0), pin = c(plot.width, plot.height))
-  }
-  par(bg = "white", fg = "black", col.lab = "black", col.main = "black", col.axis = "black", family = "Helvetica Bold", lend = 2, ljoin = 1)
-  sim.raster.new <- sim.raster
-  sim.raster.new[] <- 0
-  plot(sim.raster.new, xlab = "", ylab = "", axes = FALSE, main = "", asp = 1, col = "white", useRaster = FALSE, legend = FALSE)
-  plotRGB(x, maxpixels = ncell(x), add = T)
-
-  # plot(x,add=T,col=colors, useRaster=FALSE, legend=FALSE)
-  xseq <- c(seq(extent(x)@xmin, extent(x)@xmax, by = round_any((extent(x)@xmax - extent(x)@xmin) / 10, 1000)), extent(x)@xmax)
-  yseq <- c(seq(extent(x)@ymin, extent(x)@ymax, by = round_any((extent(x)@xmax - extent(x)@xmin) / 10, 1000)), extent(x)@ymax)
-
-  if (abs(diff(tail(xseq, n = 2))) < round_any((extent(x)@xmax - extent(x)@xmin) / 15, 1000)) {
-    xseq <- xseq[-(length(xseq) - 1)]
-  }
-
-  if (abs(diff(tail(yseq, n = 2))) < round_any((extent(x)@xmax - extent(x)@xmin) / 15, 1000)) {
-    yseq <- yseq[-(length(yseq) - 1)]
-  }
-
-  #   par(tck=(-1*(0.01)), family="Helvetica", lend=2)
-  #   axis(3, at=xseq, cex.axis=7, lwd=-1, lwd.ticks=1, padj=-.4, pos=(extent(x)@ymax), labels=FALSE)
-  #   text(xseq, extent(x)@ymax+(0.08*inch), labels = c(xseq[-length(xseq)],''), srt = 45, pos = 4, xpd = TRUE, cex=7)
-  #   axis(4, at=yseq, cex.axis=7, lwd=-1, lwd.ticks=1, padj=-.4, pos=(extent(x)@xmax), labels=FALSE)
-  #   text(extent(x)@xmax+(0.08*inch), yseq, labels = c(yseq[-length(yseq)],''), srt = 45, pos = 4, xpd = TRUE, cex=7)
-  #
-  #   text(extent(x)@xmax, extent(x)@ymax+(0.08*inch), labels = extent(x)@xmax, srt = 90, pos = 4, xpd = TRUE, cex=7)
-  #   text(extent(x)@xmax+(0.08*inch), extent(x)@ymax,labels = extent(x)@ymax, srt = 0, pos = 4, xpd = TRUE, cex=7)
-
-  plot(sim.poly, add = TRUE)
-
-  if (!is.na(extra.vector.plots.function)) {
-    FUN <- match.fun(extra.vector.plots.function)
-    FUN()
-  }
-
-  plot(sim.poly, add = TRUE)
-
-  par(bty = "o", tck = -(1 / 4))
-
-  text(extent(x)@xmin, (extent(x)@ymin - (0.14 * inch)), labels = title, pos = 4, xpd = TRUE, cex = 14, font = 2)
-
-  #   text(extent(x)@xmin,(extent(x)@ymin-(0.21*inch)), labels='R. Kyle Bocinsky', pos = 4, xpd = TRUE, cex=4,font=2)
-  #   text(extent(x)@xmin,(extent(x)@ymin-(0.28*inch)), labels=format(Sys.Date(), "%d %B %Y"), pos = 4, xpd = TRUE, cex=4,font=2)
-  #   text(extent(x)@xmin,(extent(x)@ymin-(0.35*inch)), labels=paste('PROJ.4 String: ',projection(x),sep=''), pos = 4, xpd = TRUE, cex=4,font=2)
-
-  dev.off()
-}
