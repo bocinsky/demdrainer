@@ -86,8 +86,8 @@ drain_dem <-
       reservoirsWithDams.vector[i] <- any(reservoirsWithDams[, i])
     }
 
-    Reservoirs %<>%
-      dplyr::filter(reservoirsWithDams.vector)
+    # Reservoirs %<>%
+    #   dplyr::filter(reservoirsWithDams.vector)
 
     damsWithReservoirs <- st_is_within_distance(Dams,
                                                 Reservoirs,
@@ -172,6 +172,10 @@ drain_dem <-
       st_cast('LINESTRING', do_split = TRUE) %>%
       rbind(Streams.gapped %>%
               dplyr::filter(GNIS_Nm != "Unnamed"))
+
+    Streams.gapped %<>%
+      st_cast('MULTILINESTRING') %>%
+      st_cast('LINESTRING', do_split = TRUE)
 
     res.elevs.rast <- bootstrapDrainDEM(gappedDEM = res.elevs.rast,
                                         streams = Streams.gapped %>%
