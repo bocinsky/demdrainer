@@ -10,14 +10,8 @@ status](https://codecov.io/gh/bocinsky/demdrainer/branch/master/graph/badge.svg)
 
 ## Installation
 
-You can install the released version of demdrainer from
-[CRAN](https://CRAN.R-project.org) with:
-
-``` r
-install.packages("demdrainer")
-```
-
-And the development version from [GitHub](https://github.com/) with:
+You can install the development version from
+[GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("devtools")

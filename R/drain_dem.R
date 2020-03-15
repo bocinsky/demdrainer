@@ -12,13 +12,28 @@
 #' @export
 #'
 #' @examples
-#' library(sf)
+#' library(magrittr)
 #' library(demdrainer)
-#' x <- mcor::mt_counties %>% dplyr::filter(County == "Missoula") %>% sf::st_bbox()
+#' x <-
+#'   sf::st_read(system.file("shape/nc.shp", package = "sf")) %>%
+#'   dplyr::filter(NAME == "Jackson")
+#'
+#' dem <-
+#'   FedData::get_ned(x,
+#'     label = "Jackson"
+#'   )
+#'
+#' drained_dem <-
+#'   drain_dem(dem,
+#'     label = "Jackson"
+#'   )
+#'
+#' raster::plot(dem)
+#' raster::plot(drained_dem)
 drain_dem <-
   function(x,
-             label,
-             ...) {
+           label,
+           ...) {
     if (missing(label)) {
       label <- "test"
     }
@@ -35,18 +50,20 @@ drain_dem <-
 
     nhd <- FedData::get_nhd(x,
                             label = label,
-                            ...)
+                            ...
+    )
 
     ssurgo <- FedData::get_ssurgo(x,
                                   label = label,
-                                  ...)
+                                  ...
+    )
 
     Dams <- ssurgo$spatial %>%
       sf::st_as_sf() %>%
       dplyr::left_join(ssurgo$tabular$mapunit %>%
                          dplyr::mutate(MUKEY = as.factor(mukey))) %>%
       dplyr::filter(muname == "Dam") %>%
-      sf::st_buffer(dist = 1 * res(x)[1]) %>%
+      sf::st_buffer(dist = 1 * raster::res(x)[1]) %>%
       sf::st_transform(projection(x))
 
     Streams <- nhd$`_Flowline` %>%
@@ -63,8 +80,9 @@ drain_dem <-
 
     reservoirsWithDams <- st_is_within_distance(Reservoirs,
                                                 Dams,
-                                                dist = 2 * res(x)[1],
-                                                sparse = FALSE) %>%
+                                                dist = 2 * raster::res(x)[1],
+                                                sparse = FALSE
+    ) %>%
       t()
 
     reservoirsWithDams.vector <- vector("logical", nrow(Reservoirs))
@@ -75,7 +93,8 @@ drain_dem <-
     damsWithReservoirs <- st_is_within_distance(Dams,
                                                 Reservoirs,
                                                 dist = 100,
-                                                sparse = FALSE) %>%
+                                                sparse = FALSE
+    ) %>%
       t()
 
     damsWithReservoirs.vector <- vector("logical", nrow(Dams))
@@ -90,8 +109,10 @@ drain_dem <-
       dplyr::select(GNIS_Nm)
 
     Streams.named.merged <- Streams %>%
-      dplyr::filter(!is.na(GNIS_Nm),
-                    GNIS_Nm != "<Null>") %>%
+      dplyr::filter(
+        !is.na(GNIS_Nm),
+        GNIS_Nm != "<Null>"
+      ) %>%
       dplyr::group_by(GNIS_Nm) %>%
       dplyr::summarise() %>%
       dplyr::ungroup() %>%
@@ -100,7 +121,7 @@ drain_dem <-
 
     Streams.unnamed.merged <- Streams %>%
       dplyr::filter(is.na(GNIS_Nm) |
-                    GNIS_Nm == "<Null>")  %>%
+                      GNIS_Nm == "<Null>") %>%
       dplyr::mutate(GNIS_Nm = "Unnamed") %>%
       dplyr::group_by(GNIS_Nm) %>%
       dplyr::summarise() %>%
@@ -108,7 +129,7 @@ drain_dem <-
       sf::st_cast() %>%
       sf::st_line_merge()
 
-    Streams <- rbind(Streams.named.merged,Streams.unnamed.merged)
+    Streams <- rbind(Streams.named.merged, Streams.unnamed.merged)
 
     # Join the dam and water polygons, and rasterize
     bad.data.vect <- sf::st_union(Dams, Reservoirs) %>%
@@ -117,7 +138,8 @@ drain_dem <-
 
     res.elevs.rast <- raster::mask(x,
                                    fasterize::fasterize(bad.data.vect, x),
-                                   inverse = TRUE)
+                                   inverse = TRUE
+    )
 
     bad.data.vect %<>%
       sf::st_union()
@@ -129,20 +151,22 @@ drain_dem <-
 
     Streams.gapped %<>%
       dplyr::filter(GNIS_Nm == "Unnamed") %>%
-      st_cast('LINESTRING', do_split = TRUE) %>%
+      st_cast("LINESTRING", do_split = TRUE) %>%
       rbind(Streams.gapped %>%
               dplyr::filter(GNIS_Nm != "Unnamed"))
 
     Streams.gapped %<>%
-      st_cast('MULTILINESTRING') %>%
-      st_cast('LINESTRING', do_split = TRUE)
+      st_cast("MULTILINESTRING") %>%
+      st_cast("LINESTRING", do_split = TRUE)
 
-    res.elevs.rast <- bootstrapDrainDEM(gappedDEM = res.elevs.rast,
-                                        streams = Streams.gapped %>%
-                                          as("Spatial"),
-                                        reservoirs = Reservoirs %>%
-                                          as("Spatial"),
-                                        orig.dem = x)
+    res.elevs.rast <- bootstrapDrainDEM(
+      gappedDEM = res.elevs.rast,
+      streams = Streams.gapped %>%
+        as("Spatial"),
+      reservoirs = Reservoirs %>%
+        as("Spatial"),
+      orig.dem = x
+    )
 
     dem.final <- fillIDW(res.elevs.rast)
 
