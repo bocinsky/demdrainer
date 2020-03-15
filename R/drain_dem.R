@@ -57,23 +57,9 @@ drain_dem <-
     Reservoirs <- nhd$`_Waterbody` %>%
       sf::st_as_sf() %>%
       dplyr::filter(FCode %in% c(39004, 39009, 39010, 39001, 39012)) %>%
-      # tibble::as_tibble() %>%
-      # dplyr::bind_rows(nhd$`_Area` %>%
-      #                    sf::st_as_sf() %>%
-      #                    tibble::as_tibble()) %>%
-      # sf::st_as_sf() %>%
       dplyr::filter(AreSqKm > 0.16) %>%
       lwgeom::st_make_valid() %>%
       sf::st_transform(projection(x))
-
-    # Dams %<>%
-    #   as("Spatial")
-    #
-    # Streams %<>%
-    #   as("Spatial")
-    #
-    # Reservoirs %<>%
-    #   as("Spatial")
 
     reservoirsWithDams <- st_is_within_distance(Reservoirs,
                                                 Dams,
@@ -85,9 +71,6 @@ drain_dem <-
     for (i in 1:nrow(Reservoirs)) {
       reservoirsWithDams.vector[i] <- any(reservoirsWithDams[, i])
     }
-
-    # Reservoirs %<>%
-    #   dplyr::filter(reservoirsWithDams.vector)
 
     damsWithReservoirs <- st_is_within_distance(Dams,
                                                 Reservoirs,
@@ -127,29 +110,6 @@ drain_dem <-
 
     Streams <- rbind(Streams.named.merged,Streams.unnamed.merged)
 
-    # Streams <- spRbind(Streams.named.merged, Streams.unnamed.merged)
-    # Streams <- mergeStreams(Streams, projection(x))
-    #
-    # Streams %<>%
-    #   dplyr::select(GNIS_Nm) %>%
-    #   dplyr::group_by(GNIS_Nm) %>%
-    #   dplyr::summarise() %>%
-    #   dplyr::ungroup() %>%
-    #   sf::st_cast() %>%
-    #   sf::st_line_merge()
-    #
-    # %>%
-    #   as("Spatial") %>%
-    #   mergeStreams(projection(x))
-    #
-    #
-    # Streams.named <- Streams[!is.na(Streams$GNIS_Nm), ]
-    # Streams.unnamed <- Streams[is.na(Streams$GNIS_Nm), ]
-    # Streams.named.merged <- gLineMerge(Streams.named, byid = T, id = Streams.named$GNIS_Nm)
-    # Streams.unnamed.merged <- gLineMerge(Streams.unnamed)
-    # Streams <- spRbind(Streams.named.merged, Streams.unnamed.merged)
-    # Streams <- mergeStreams(Streams, projection(x))
-
     # Join the dam and water polygons, and rasterize
     bad.data.vect <- sf::st_union(Dams, Reservoirs) %>%
       sf::st_cast() %>%
@@ -186,9 +146,5 @@ drain_dem <-
 
     dem.final <- fillIDW(res.elevs.rast)
 
-    # A 5x5 mean smooth
-    # dem.final.smoothed <- focal(dem.final, w = matrix(1, nrow = 5, ncol = 5), fun = mean, na.rm = T, pad = T)
-
-    # return(dem.final.smoothed)
     return(dem.final)
   }
