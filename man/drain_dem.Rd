@@ -10,7 +10,9 @@ drain_dem(x, label, ...)
 \item{x}{A \link[raster:raster]{raster::raster} DEM. Alternatively, a \link[sf:st_bbox]{sf::st_bbox} object for which a DEM will
 be downloaded}
 
-\item{...}{Arguments passed on to various \link{FedData} functions.}
+\item{label}{A character string naming the study area.}
+
+\item{...}{Arguments passed on to various \code{FedData} functions.}
 }
 \value{
 A drained \link[raster:raster]{raster::raster} DEM.
@@ -20,7 +22,19 @@ Given a digital elevation model (DEM) with human-made dammed reservoirs,
 returns a version with estimates for elevations under reservoirs and dams.
 }
 \examples{
-library(sf)
+library(magrittr)
 library(demdrainer)
-x <- mcor::mt_counties \%>\% dplyr::filter(County == "Missoula") \%>\% sf::st_bbox()
+
+dem <-
+  FedData::get_ned(demdrainer::mcphee,
+    label = "McPhee"
+  )
+
+drained_dem <-
+  drain_dem(dem,
+    label = "McPhee"
+  )
+
+raster::plot(dem)
+raster::plot(drained_dem)
 }

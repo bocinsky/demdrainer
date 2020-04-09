@@ -1,6 +1,6 @@
 # MIT License
 
-Copyright (c) 2018 R. Kyle Bocinsky
+Copyright (c) 2020 R. Kyle Bocinsky
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

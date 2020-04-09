@@ -11,6 +11,7 @@
 # interpolated values added to the DEM.
 #
 # This process is repeated until no more streams may be interpolated.
+#' @importFrom sp %over%
 bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
   done <- FALSE
   last <- FALSE
@@ -33,9 +34,9 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
     for (i in 1:length(streams)) {
       if (finished.lines[i]) next
       ends[[i]] <- raster::extract(gappedDEM,
-        matrix(c(head(streams[i, ]@lines[[1]]@Lines[[1]]@coords,
+        matrix(c(utils::head(streams[i, ]@lines[[1]]@Lines[[1]]@coords,
           n = 1
-        ), tail(streams[i, ]@lines[[1]]@Lines[[1]]@coords,
+        ), utils::tail(streams[i, ]@lines[[1]]@Lines[[1]]@coords,
           n = 1
         )),
         nrow = 2,
@@ -87,8 +88,8 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
 
         ends[[i]] <- raster::extract(gappedDEM,
           matrix(c(
-            head(streams[i, ]@lines[[1]]@Lines[[1]]@coords, n = 1),
-            tail(streams[i, ]@lines[[1]]@Lines[[1]]@coords, n = 1)
+            utils::head(streams[i, ]@lines[[1]]@Lines[[1]]@coords, n = 1),
+            utils::tail(streams[i, ]@lines[[1]]@Lines[[1]]@coords, n = 1)
           ),
           nrow = 2,
           byrow = T
@@ -122,7 +123,7 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
 
       temp <- data.frame(1:length(extracts[[i]][, 2]), extracts[[i]][, 2], extracts[[i]][, 1])
       names(temp) <- c("index", "elevation", "cell")
-      if (all(is.na(head(temp$elevation, n = 6))) | all(is.na(tail(temp$elevation, n = 6)))) next
+      if (all(is.na(utils::head(temp$elevation, n = 6))) | all(is.na(utils::tail(temp$elevation, n = 6)))) next
 
       temp$elevation <- make.monotonic(temp$elevation)
 
@@ -191,8 +192,8 @@ bootstrapDrainDEM <- function(gappedDEM, streams, reservoirs, orig.dem) {
   if (any(!finished.lines)) {
     # Lakes where no interpolated values could be determined (usually
     # shallow stock-ponds) are re-filled with their original elevations.
-    reservoirs <- sp::spTransform(reservoirs, CRS(projection(gappedDEM)))
-    unfinished.streams <- sp::spTransform(Streams.gapped[!finished.lines], CRS(projection(gappedDEM)))
+    reservoirs <- sp::spTransform(reservoirs, sp::CRS(raster::projection(gappedDEM)))
+    unfinished.streams <- sp::spTransform(streams[!finished.lines], sp::CRS(raster::projection(gappedDEM)))
     if (any(is.na(c(reservoirs %over% unfinished.streams)))) {
       reservoirs.no.fill <- reservoirs[is.na(c(reservoirs %over% unfinished.streams)), ]
       reservoirs.no.fill.rast <- raster::extract(orig.dem, reservoirs.no.fill, cellnumbers = T)
@@ -238,7 +239,7 @@ fillIDW <- function(gappedDEM) {
     nmax = 7,
     set = list(idp = 0.5)
   )
-  gappedDEM.df.new <- predict(gappedDEM.idw.model, newdata = gappedDEM.df.unknown)
+  gappedDEM.df.new <- stats::predict(gappedDEM.idw.model, newdata = gappedDEM.df.unknown)
   gappedDEM.df.new$CELL <- raster::cellFromXY(gappedDEM, as.matrix(gappedDEM.df.new[, 1:2]))
   gappedDEM.final <- gappedDEM
   gappedDEM.final[gappedDEM.df.new$CELL] <- gappedDEM.df.new$ELEVATION.pred

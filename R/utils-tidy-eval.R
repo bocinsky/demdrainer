@@ -13,3 +13,17 @@
 #' @export           quo quos enquo sym syms ensym expr exprs enexpr quo_name
 #' @importFrom rlang UQ UQS .data :=
 NULL
+
+# Make CRAN check not complain about "." and package data
+if (getRversion() >= "2.15.1") utils::globalVariables(c("mukey",
+                                                        "muname",
+                                                        "FCode",
+                                                        "AreaSqKm",
+                                                        "GNIS_Name"))
+
+#' Polygon of bounding box around McPhee Reservoir, Colorado
+#'
+#' A dataset containing the bounding box around McPhee Reservoir, Colorado.
+#'
+#' @format A geometry set with one feature.
+"mcphee"
