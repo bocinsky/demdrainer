@@ -13,7 +13,9 @@ Suggests:
     covr (>= 3.0.1),
     testthat (>= 2.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    mapview,
+    leafsync
 ByteCompile: true
 Encoding: UTF-8
 LazyData: true

@@ -76,7 +76,7 @@ drain_dem <-
       sf::st_as_sf() %>%
       dplyr::filter(FCode %in% c(39004, 39009, 39010, 39001, 39012)) %>%
       dplyr::filter(AreaSqKm > 0.16) %>%
-      lwgeom::st_make_valid() %>%
+      sf::st_make_valid() %>%
       sf::st_transform(raster::projection(x))
 
     reservoirsWithDams <- sf::st_is_within_distance(Reservoirs,

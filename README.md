@@ -18,6 +18,22 @@ You can install the development version from
 devtools::install_github("bocinsky/demdrainer")
 ```
 
+## Drain a DEM
+
+``` r
+  library(magrittr)
+  library(demdrainer)
+  library(mapview)
+  library(leafsync)
+  
+  dem <- FedData::get_ned(demdrainer::mcphee, label = "McPhee")
+  
+  drained_dem <- drain_dem(dem, label = "McPhee")
+  
+  sync(mapview(dem), mapview(drained_dem))
+  
+```
+
 ## Contributing
 
 Please note that this project is released with a [Contributor Code of
